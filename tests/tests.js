@@ -19,7 +19,7 @@
         return this.moles + this.next();
       },
 
-      // this overwrites moles declared in the first link
+      // this does not overwrite moles declared in the first link
       moles: 2
     },
 
@@ -48,22 +48,22 @@
 
     test("basic usage", function() {
       var whackAMole = Chain.create(WhackAMole);
-      equal(whackAMole.molesRemaining(), "2 moles remaining");
+      equal(whackAMole.molesRemaining(), "1 mole remaining");
 
       whackAMole.addAMole();
-      equal(whackAMole.molesRemaining(), "3 moles remaining");
+      equal(whackAMole.molesRemaining(), "2 moles remaining");
 
       whackAMole.whackAMole();
       whackAMole.whackAMole();
-      equal(whackAMole.molesRemaining(), "1 mole remaining");
+      equal(whackAMole.molesRemaining(), "0 moles remaining");
     });
 
     test("composite usage", function() {
       var whackARodent = Chain.create(WhackARodent);
-      equal(whackARodent.molesRemaining(), "2 moles remaining");
+      equal(whackARodent.molesRemaining(), "1 mole remaining");
       equal(whackARodent.miceRemaining(), "1 mouse remaining");
 
-      equal(whackARodent.rodentsRemaining(), "2 moles remaining 1 mouse remaining");
+      equal(whackARodent.rodentsRemaining(), "1 mole remaining 1 mouse remaining");
     });
 
 }() );

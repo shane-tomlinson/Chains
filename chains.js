@@ -26,7 +26,7 @@ function Chain() {
 
   for (var link, i = 0; link = args[i]; ++i) {
     if (link.links) {
-      for(var j = 0, innerLink; innerLink = link.links[j]; ++j) {
+      for (var j = 0, innerLink; innerLink = link.links[j]; ++j) {
         links.push(innerLink);
       }
     }
@@ -54,15 +54,30 @@ Chain.create = function(links) {
   var proxy = {};
   for (var i = 0, link; link = links[i]; ++i) {
     for (var key in link) {
-      var type = Object.prototype.toString.call(link[key]);
-      if (type === "[object Function]" && !proxy[key]) {
-        proxy[key] = _findNext.bind(proxy, links, key, i);
-      }
-      else if(type === "[object Array]" || type === "[object Object]") {
-        // XXX create a deep copy
-      }
-      else if (type !== "[object Function]") {
-        proxy[key] = link[key];
+      if (!(key in proxy)) {
+        var item = link[key],
+            type = Object.prototype.toString.call(item);
+
+        if (type === "[object Function]") {
+          proxy[key] = _findNext.bind(proxy, links, key, i);
+        }
+        else if (type === "[object Array]") {
+          // create a shallow copy.
+          proxy[key] = [];
+          for (var i=0, len=item.length; i < len; ++i) {
+            proxy[key][i] = item[i];
+          }
+        }
+        else if (type === "[object Object]") {
+          // create a shallow copy.
+          proxy[key] = {};
+          for (var k in item) {
+            proxy[key] = item[k];
+          }
+        }
+        else {
+          proxy[key] = item;
+        }
       }
     }
   }
@@ -90,8 +105,8 @@ Chain.create = function(links) {
   }
 
   function findNext(links, key, index) {
-    for(var link; link=links[index]; ++index) {
-      if(link[key]) {
+    for (var link; link=links[index]; ++index) {
+      if (link[key]) {
         return { next: link[key], index: index + 1 };
       }
     }
