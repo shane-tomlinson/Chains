@@ -45,45 +45,60 @@
     return copy;
   }
 
-  function setupProxy(links) {
-    var proxy = {};
-    // Go through each link searching for functions. Create a proxy function
-    // for each function found that is not already part of the proxy.
-    for (var i = 0, link; link = links[i]; ++i) {
-      for (var key in link) {
-        var item = link[key],
-            type = Object.prototype.toString.call(item);
+  function addLinkToChain(chain, link) {
+    for (var key in link) {
+      var item = link[key],
+          type = Object.prototype.toString.call(item);
 
-        if (type === "[object Function]") {
-          if (!(key in proxy)) {
-            // create a new proxy function and function chain.
-            var funcChain = [item];
-            proxy[key] = proxyFunc.bind(proxy, funcChain, 0);
-            proxy[key].chain = funcChain;
-          }
-          else if(proxy[key].chain) {
-            // add to existing function chain.
-            proxy[key].chain.push(item);
-          }
-          else {
-            throw new Error("Cannot override a non-function member with a function");
-          }
+      if (type === "[object Function]") {
+        if (!(key in chain)) {
+          // each function in the chain with the same name gets put into the
+          // function list. When a chain instance function is called, each item
+          // in the funcList is called in order.
+          var funcList = [item];
+          chain[key] = proxyFunc.bind(chain, funcList, 0);
+          chain[key].funcList = funcList;
         }
-        else if(!(key in proxy)) {
-          proxy[key] = shallowCopy(item, type);
+        else if (chain[key].funcList) {
+          // add to existing function list.
+          chain[key].funcList.push(item);
+        }
+        else {
+          throw new Error("cannot override a non-function member with a function");
         }
       }
+      else if (!(key in chain)) {
+        // not a function, make a copy of the item.
+        chain[key] = shallowCopy(item, type);
+      }
     }
-
-    return proxy;
   }
 
-  function proxyFunc(funcChain, index) {
-    var func = funcChain[index],
+  function setupChain(proxy, links) {
+    // Go through each link searching for functions.
+    for (var i = 0, link; link = links[i]; ++i) {
+      if (link.links) {
+        // A composite link, expand out each link contained within and add it
+        // to the chain.
+        setupChain(proxy, link.links);
+      }
+      else {
+        // Normal link. Create a proxy function for each function found that is
+        // not already part of the proxy.
+        addLinkToChain(proxy, link);
+      }
+    }
+  }
+
+  function proxyFunc(funcList, index) {
+    /*jshint validthis: true*/
+    var func = funcList[index],
         prevNext = this.next;
 
-    if (index < funcChain.length) {
-      this.next = proxyFunc.bind(this, funcChain, index + 1);
+    if (index < funcList.length) {
+      // this.next points back to the proxy function, the proxy function will
+      // call the next item in the list.
+      this.next = proxyFunc.bind(this, funcList, index + 1);
     }
     else {
       // last item in the chain, there is no next function.
@@ -100,39 +115,22 @@
   }
 
   function Chain() {
-    var links = [],
-        args = [].slice.call(arguments, 0);
+    var links = [].slice.call(arguments, 0);
 
-    for (var link, i = 0; link = args[i]; ++i) {
-      if (link.links) {
-        for (var j = 0, innerLink; innerLink = link.links[j]; ++j) {
-          links.push(innerLink);
-        }
-      }
-      else if (Object.prototype.toString.call(link) === "[object Object]") {
-        links.push(link);
-      }
-      else {
-        throw new Error("invalid link");
-      }
-    }
-
-    return {
-      links: links
-    };
+    function chain() {}
+    chain.prototype = {};
+    setupChain(chain.prototype, links);
+    chain.links = links;
+    return chain;
   }
 
   // The creation function.  Called like: Chain.create(constructor_to_use);
-  Chain.create = function(links) {
-    links = links.links;
-
-    if (Object.prototype.toString.call(links) !== "[object Array]") {
-      throw new Error("invalid links");
+  Chain.create = function(chain) {
+    if (!chain.links) {
+      throw new Error("invalid chain");
     }
 
-    var proxy = setupProxy(links);
-    return proxy;
-
+    return new chain();
   };
 
   exports.Chain = Chain;
