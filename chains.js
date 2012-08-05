@@ -1,41 +1,29 @@
-(function(exports, undefined) {
+(function(exports) {
   "use strict";
 
-  // Function.prototype.bind polyfill from MDN.
-  if (!Function.prototype.bind) {
+  function bind(func, obj) {
+    var args = [].slice.call(arguments, 2);
 
-    Function.prototype.bind = function(obj) {
-      if (typeof this !== 'function') // closest thing possible to the ECMAScript 5 internal IsCallable function
-        throw new TypeError('Function.prototype.bind - what is trying to be bound is not callable');
-
-      var slice = [].slice,
-          args = slice.call(arguments, 1),
-          self = this,
-          nop = function () {},
-          bound = function () {
-            return self.apply(this instanceof nop ? this : (obj || {}),
-                                args.concat(slice.call(arguments)));
-          };
-
-      bound.prototype = this.prototype;
-
-      return bound;
+    return function() {
+      var newArgs = [].slice.call(arguments);
+      return func.apply(obj, args.concat(newArgs));
     };
   }
 
-  function shallowCopy(item, type) {
-    var copy;
+  function deepCopy(item) {
+    var copy,
+        type = Object.prototype.toString.call(item);
 
     if (type === "[object Array]") {
       copy = [];
       for (var i=0, len=item.length; i < len; ++i) {
-        copy[i] = item[i];
+        copy[i] = deepCopy(item[i]);
       }
     }
     else if (type === "[object Object]") {
       copy = {};
       for (var k in item) {
-        copy = item[k];
+        copy[k] = deepCopy(item[k]);
       }
     }
     else {
@@ -56,12 +44,12 @@
           // function list. When a chain instance function is called, each item
           // in the funcList is called in order.
           var funcList = [item];
-          chain[key] = proxyFunc.bind(chain, funcList, 0);
-          chain[key].funcList = funcList;
+          chain[key] = bind(proxyFunc, chain, funcList, 0);
+          chain[key].__funcList = funcList;
         }
-        else if (chain[key].funcList) {
+        else if (chain[key].__funcList) {
           // add to existing function list.
-          chain[key].funcList.push(item);
+          chain[key].__funcList.push(item);
         }
         else {
           throw new Error("cannot override a non-function member with a function");
@@ -69,18 +57,22 @@
       }
       else if (!(key in chain)) {
         // not a function, make a copy of the item.
-        chain[key] = shallowCopy(item, type);
+        chain[key] = deepCopy(item);
       }
     }
   }
 
   function setupChain(proxy, links) {
-    // Go through each link searching for functions.
+    // Go through each link in the chain, set up instance variables and
+    // functions on the proxy.  For each named function, create an array
+    // that keeps track of the ordering of all functions with the same name.
+    // When called, the proxy function will call each function in the array in
+    // order.
     for (var i = 0, link; link = links[i]; ++i) {
-      if (link.links) {
+      if (link.__links) {
         // A composite link, expand out each link contained within and add it
         // to the chain.
-        setupChain(proxy, link.links);
+        setupChain(proxy, link.__links);
       }
       else {
         // Normal link. Create a proxy function for each function found that is
@@ -96,9 +88,9 @@
         prevNext = this.next;
 
     if (index < funcList.length) {
-      // this.next points back to the proxy function, the proxy function will
+      // this.next points to the proxy function, the proxy function will
       // call the next item in the list.
-      this.next = proxyFunc.bind(this, funcList, index + 1);
+      this.next = bind(proxyFunc, this, funcList, index + 1);
     }
     else {
       // last item in the chain, there is no next function.
@@ -120,16 +112,13 @@
     function chain() {}
     chain.prototype = {};
     setupChain(chain.prototype, links);
-    chain.links = links;
+    chain.__links = links;
     return chain;
   }
 
   // The creation function.  Called like: Chain.create(constructor_to_use);
   Chain.create = function(chain) {
-    if (!chain.links) {
-      throw new Error("invalid chain");
-    }
-
+    if (!chain.__links) throw new Error("invalid chain");
     return new chain();
   };
 
