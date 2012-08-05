@@ -90,10 +90,10 @@ var EventEmitter = {
   init: function() {
     /* do some EventEmitter initialization */
       this.next();
-    },
-    emit: function() {
-      /* emit an event */
-      this.next();
+  },
+  emit: function() {
+    /* emit an event */
+    this.next();
   }
 };
 
