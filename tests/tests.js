@@ -30,6 +30,13 @@
 
       addAMole: function() {
         this.moles++;
+      },
+
+      moleNames: ['Larry', 'Curley', 'Moe'],
+      moleDOB: {
+        Larry: '6/6/12',
+        Curly: '6/7/12',
+        Moe:   '6/8/12'
       }
     });
 
@@ -64,6 +71,18 @@
       equal(whackARodent.miceRemaining(), "1 mouse remaining");
 
       equal(whackARodent.rodentsRemaining(), "1 mole remaining 1 mouse remaining");
+
+      // Check whether deep copy works correctly
+      var whackAMole = Chain.create(WhackAMole);
+
+      // If updating these affects the moleNames and moleDOB on whackARodent,
+      // deepCopy is not working correctly.
+      whackAMole.moleDOB.Curley = '6/9/12';
+      whackAMole.moleNames.pop();
+      delete whackAMole.moleNames.Moe;
+
+      equal(whackARodent.moleNames.length, 3, "Array copied correctly");
+      equal(whackARodent.moleDOB.Moe, '6/8/12', "Object copied correctly");
     });
 
 }() );
